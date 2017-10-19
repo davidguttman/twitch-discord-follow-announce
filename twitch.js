@@ -11,6 +11,11 @@ var tokenCache = new AsyncCache({
   load: function (id, cb) { getToken(config, cb) }
 })
 
+var userCache = new AsyncCache({
+  maxAge: 36e5,
+  load: getUserId
+})
+
 module.exports = function followStream (channel) {
   var stream = through()
 
@@ -19,7 +24,6 @@ module.exports = function followStream (channel) {
       checkFollow(login, channel, function (err, doesFollow) {
         if (err) return console.error(err)
 
-        console.log(login, 'doesFollow', channel, doesFollow)
         stream.write({
           fromUser: login,
           toUser: channel,
@@ -53,16 +57,14 @@ function joinStream (opts) {
 }
 
 function checkFollow (fromUserName, toUserName, cb) {
-  getUserId(fromUserName, function (err, fromId) {
+  userCache.get(fromUserName, function (err, fromId) {
     if (err) return cb(err)
 
-    getUserId(toUserName, function (err, toId) {
+    userCache.get(toUserName, function (err, toId) {
       if (err) return cb(err)
 
       getFollows(fromId, function (err, follows) {
         if (err) return cb(err)
-
-        console.log('follows.length', follows.length)
 
         var doesFollow = !!follows.filter(function (follow) {
           return follow.to_id === toId
@@ -89,6 +91,7 @@ function getUserId (name, cb) {
   })
 }
 
+var lastFetch = 0
 function getTwitch (path, opts, cb) {
   tokenCache.get(null, function (err, token) {
     if (err) return cb(err)
@@ -101,9 +104,14 @@ function getTwitch (path, opts, cb) {
       json: true
     }
 
-    request(rOpts, function (err, res, body) {
-      cb(err, body)
-    })
+    var timeSinceLastFetch = Date.now() - lastFetch
+    var wait = 500 - timeSinceLastFetch
+    if (wait < 0) wait = 0
+    lastFetch = Date.now() + wait
+
+    setTimeout(function () {
+      request(rOpts, function (err, res, body) { cb(err, body) })
+    }, wait)
   })
 }
 
