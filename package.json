@@ -1,25 +1,38 @@
 {
-  "name": "ulti-alerts",
+  "name": "twitch-discord-follow-announce",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "test": "npm run deps && standard",
+    "dev": "nodemon index.js",
+    "deps": "npm run deps-missing && npm run deps-extra",
+    "deps-missing": "dependency-check --no-dev .",
+    "deps-extra": "dependency-check --no-dev --extra ."
   },
   "keywords": [],
   "author": "David Guttman <david@guttman.io> (http://davidguttman.com/)",
   "license": "MIT",
   "dependencies": {
     "async-cache": "^1.1.0",
+    "corsify": "^2.1.0",
+    "cuid": "^1.3.8",
     "discord.io": "^2.5.3",
-    "discord.js": "^11.2.1",
+    "dotenv": "^4.0.0",
+    "healthpoint": "^1.0.0",
+    "http-hash-router": "^1.1.0",
     "lodash.get": "^4.4.2",
+    "productionize": "^4.0.0",
+    "req-logger": "^2.0.0",
     "request": "^2.83.0",
+    "send-data": "^8.0.0",
     "through2": "^2.0.3",
-    "tmi.js": "^1.2.1",
-    "twitch-api-v5": "^2.0.2"
+    "tmi.js": "^1.2.1"
   },
   "devDependencies": {
+    "dependency-check": "^2.9.1",
+    "nodemon": "^1.12.1",
     "standard": "^10.0.3"
   }
 }

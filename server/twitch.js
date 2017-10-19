@@ -4,7 +4,7 @@ var request = require('request')
 var through = require('through2').obj
 var AsyncCache = require('async-cache')
 
-var config = require('./config.json').twitch
+var config = require('../config').twitch
 
 var tokenCache = new AsyncCache({
   maxAge: 36e5,
@@ -22,7 +22,7 @@ module.exports = function followStream (channel) {
   joinStream({channels: ['#' + channel]})
     .on('data', function (login) {
       checkFollow(login, channel, function (err, doesFollow) {
-        if (err) return console.error(err)
+        if (err) return stream.emit('error', err)
 
         stream.write({
           fromUser: login,
@@ -41,7 +41,7 @@ function joinStream (opts) {
   var stream = through()
 
   var options = {
-    options: { debug: true },
+    // options: { debug: true },
     connection: { reconnect: true },
     channels: opts.channels
   }
