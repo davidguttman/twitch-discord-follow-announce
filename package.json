@@ -10,6 +10,7 @@
   "author": "David Guttman <david@guttman.io> (http://davidguttman.com/)",
   "license": "MIT",
   "dependencies": {
+    "async-cache": "^1.1.0",
     "discord.io": "^2.5.3",
     "discord.js": "^11.2.1",
     "lodash.get": "^4.4.2",

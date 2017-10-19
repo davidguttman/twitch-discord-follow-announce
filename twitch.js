@@ -2,32 +2,31 @@ var _ = {get: require('lodash.get')}
 var tmi = require('tmi.js')
 var request = require('request')
 var through = require('through2').obj
+var AsyncCache = require('async-cache')
 
 var config = require('./config.json').twitch
 
-var clientId = config.id
-var clientSecret = config.secret
+var tokenCache = new AsyncCache({
+  maxAge: 36e5,
+  load: function (id, cb) { getToken(config, cb) }
+})
 
 module.exports = function followStream (channel) {
   var stream = through()
 
-  getToken(function (err, token) {
-    if (err) return console.error(err)
+  joinStream({channels: ['#' + channel]})
+    .on('data', function (login) {
+      checkFollow(login, channel, function (err, doesFollow) {
+        if (err) return console.error(err)
 
-    joinStream({channels: ['#' + channel]})
-      .on('data', function (login) {
-        checkFollow(token, login, channel, function (err, doesFollow) {
-          if (err) return console.error(err)
-
-          console.log(login, 'doesFollow', channel, doesFollow)
-          stream.write({
-            fromUser: login,
-            toUser: channel,
-            doesFollow: doesFollow
-          })
+        console.log(login, 'doesFollow', channel, doesFollow)
+        stream.write({
+          fromUser: login,
+          toUser: channel,
+          doesFollow: doesFollow
         })
       })
-  })
+    })
 
   return stream
 }
@@ -51,35 +50,23 @@ function joinStream (opts) {
   return stream
 }
 
-function checkFollow (token, fromUserName, toUserName, cb) {
-  getUser(token, fromUserName, function (err, fromUser) {
+function checkFollow (fromUserName, toUserName, cb) {
+  getUser(fromUserName, function (err, fromUser) {
     if (err) return cb(err)
 
-    getUser(token, toUserName, function (err, toUser) {
+    getUser(toUserName, function (err, toUser) {
       if (err) return cb(err)
 
       var fromId = _.get(fromUser, 'data.0.id')
       var toId = _.get(toUser, 'data.0.id')
 
       // console.log({fromId, toId})
-
-      var opts = {
-        url: 'https://api.twitch.tv/helix/users/follows',
-        headers: {Authorization: 'Bearer ' + token},
-        qs: { from_id: fromId },
-        gzip: true,
-        json: true
-      }
-
-      request(opts, function (err, res, body) {
+      getFollows(fromId, function (err, follows) {
         if (err) return cb(err)
 
-        var doesFollow = false
-        var follows = _.get(body, 'data') || []
-        follows.forEach(function (follow) {
-          // console.log({follow})
-          if (follow.to_id === toId) doesFollow = true
-        })
+        var doesFollow = !!follows.filter(function (follow) {
+          return follow.to_id === toId
+        })[0]
 
         cb(null, doesFollow)
       })
@@ -87,26 +74,49 @@ function checkFollow (token, fromUserName, toUserName, cb) {
   })
 }
 
-function getUser (token, name, cb) {
-  var opts = {
-    url: 'https://api.twitch.tv/helix/users',
-    headers: {Authorization: 'Bearer ' + token},
-    qs: { login: name },
-    gzip: true,
-    json: true
-  }
+function getFollows (userId, cb) {
+  tokenCache.get(null, function (err, token) {
+    if (err) return cb(err)
 
-  request(opts, function (err, res, body) { cb(err, body) })
+    var opts = {
+      url: 'https://api.twitch.tv/helix/users/follows',
+      headers: {Authorization: 'Bearer ' + token},
+      qs: { from_id: userId, first: 100 },
+      gzip: true,
+      json: true
+    }
+
+    request(opts, function (err, res, body) {
+      if (err) return cb(err)
+      cb(null, _.get(body, 'data') || [])
+    })
+  })
 }
 
-function getToken (cb) {
+function getUser (name, cb) {
+  tokenCache.get(null, function (err, token) {
+    if (err) return cb(err)
+
+    var opts = {
+      url: 'https://api.twitch.tv/helix/users',
+      headers: {Authorization: 'Bearer ' + token},
+      qs: { login: name },
+      gzip: true,
+      json: true
+    }
+
+    request(opts, function (err, res, body) { cb(err, body) })
+  })
+}
+
+function getToken (config, cb) {
   var opts = {
     url: 'https://api.twitch.tv/kraken/oauth2/token',
     gzip: true,
     json: true,
     qs: {
-      client_id: clientId,
-      client_secret: clientSecret,
+      client_id: config.id,
+      client_secret: config.secret,
       grant_type: 'client_credentials'
     }
   }
