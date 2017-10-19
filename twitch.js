@@ -44,25 +44,25 @@ function joinStream (opts) {
 
   var Client = tmi.client
   new Client(options)
-    .on('join', function (channel, name, self) { !self && stream.write(name) })
+    .on('join', onJoin)
     .connect()
 
   return stream
+
+  function onJoin (channel, name, self) { if (!self) stream.write(name) }
 }
 
 function checkFollow (fromUserName, toUserName, cb) {
-  getUser(fromUserName, function (err, fromUser) {
+  getUserId(fromUserName, function (err, fromId) {
     if (err) return cb(err)
 
-    getUser(toUserName, function (err, toUser) {
+    getUserId(toUserName, function (err, toId) {
       if (err) return cb(err)
 
-      var fromId = _.get(fromUser, 'data.0.id')
-      var toId = _.get(toUser, 'data.0.id')
-
-      // console.log({fromId, toId})
       getFollows(fromId, function (err, follows) {
         if (err) return cb(err)
+
+        console.log('follows.length', follows.length)
 
         var doesFollow = !!follows.filter(function (follow) {
           return follow.to_id === toId
@@ -75,37 +75,35 @@ function checkFollow (fromUserName, toUserName, cb) {
 }
 
 function getFollows (userId, cb) {
-  tokenCache.get(null, function (err, token) {
+  var opts = { from_id: userId, first: 100 }
+  getTwitch('users/follows', opts, function (err, body) {
     if (err) return cb(err)
-
-    var opts = {
-      url: 'https://api.twitch.tv/helix/users/follows',
-      headers: {Authorization: 'Bearer ' + token},
-      qs: { from_id: userId, first: 100 },
-      gzip: true,
-      json: true
-    }
-
-    request(opts, function (err, res, body) {
-      if (err) return cb(err)
-      cb(null, _.get(body, 'data') || [])
-    })
+    cb(null, _.get(body, 'data') || [])
   })
 }
 
-function getUser (name, cb) {
+function getUserId (name, cb) {
+  getTwitch('users', {login: name}, function (err, body) {
+    if (err) return cb(err)
+    cb(null, _.get(body, 'data.0.id'))
+  })
+}
+
+function getTwitch (path, opts, cb) {
   tokenCache.get(null, function (err, token) {
     if (err) return cb(err)
 
-    var opts = {
-      url: 'https://api.twitch.tv/helix/users',
+    var rOpts = {
+      url: 'https://api.twitch.tv/helix/' + path,
       headers: {Authorization: 'Bearer ' + token},
-      qs: { login: name },
+      qs: opts,
       gzip: true,
       json: true
     }
 
-    request(opts, function (err, res, body) { cb(err, body) })
+    request(rOpts, function (err, res, body) {
+      cb(err, body)
+    })
   })
 }
 
