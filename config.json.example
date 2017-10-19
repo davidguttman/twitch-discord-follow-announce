@@ -1,0 +1,9 @@
+{
+  "twitch": {
+    "id": "xxx",
+    "secret": "xxx"
+  },
+  "discord": {
+    "token": "xxx"
+  }
+}
