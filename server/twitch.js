@@ -76,11 +76,27 @@ function checkFollow (fromUserName, toUserName, cb) {
   })
 }
 
-function getFollows (userId, cb) {
-  var opts = { from_id: userId, first: 100 }
-  getTwitch('users/follows', opts, function (err, body) {
+function getFollows (userId, opts, cb) {
+  if (typeof opts === 'function') {
+    cb = opts
+    opts = {}
+  }
+
+  var follows = opts.follows || []
+
+  var rOpts = { from_id: userId, first: 100, after: opts.after }
+
+  getTwitch('users/follows', rOpts, function (err, body) {
     if (err) return cb(err)
-    cb(null, _.get(body, 'data') || [])
+
+    var nextFollows = _.get(body, 'data') || []
+    var allFollows = follows.concat(nextFollows)
+
+    if (nextFollows.length < 100) return cb(null, allFollows)
+
+    var after = _.get(body, 'pagination.cursor')
+
+    getFollows(userId, { follows: allFollows, after: after }, cb)
   })
 }
 
